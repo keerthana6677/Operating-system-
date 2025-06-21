@@ -1,63 +1,46 @@
-#include <stdio.h>
+#include <fcntl.h>     // For open()
+#include <unistd.h>    // For read(), write(), close()
+#include <stdio.h>     // For perror()
+#include <stdlib.h>    // For exit()
 
-struct Process {
-    int pid;
-    int burstTime;
-    int waitingTime;
-    int turnaroundTime;
-};
-
-// Swap function for sorting
-void swap(struct Process *a, struct Process *b) {
-    struct Process temp = *a;
-    *a = *b;
-    *b = temp;
-}
+#define BUFFER_SIZE 1024
 
 int main() {
-    int n, totalWaitingTime = 0, totalTurnaroundTime = 0;
+    int source_fd, dest_fd;
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_read, bytes_written;
 
-    printf("Enter the number of processes: ");
-    scanf("%d", &n);
-
-    struct Process p[n];
-
-    // Input burst times
-    for (int i = 0; i < n; i++) {
-        p[i].pid = i + 1;
-        printf("Enter Burst Time for Process %d: ", p[i].pid);
-        scanf("%d", &p[i].burstTime);
+    // Open the source file for reading
+    source_fd = open("source.txt", O_RDONLY);
+    if (source_fd < 0) {
+        perror("Error opening source file");
+        exit(1);
     }
 
-    // Sort processes by burst time (Shortest Job First)
-    for (int i = 0; i < n - 1; i++) {
-        for (int j = 0; j < n - i - 1; j++) {
-            if (p[j].burstTime > p[j + 1].burstTime) {
-                swap(&p[j], &p[j + 1]);
-            }
+    // Open or create the destination file with write permission
+    dest_fd = open("destination.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (dest_fd < 0) {
+        perror("Error opening/creating destination file");
+        close(source_fd);
+        exit(1);
+    }
+
+    // Read from source and write to destination
+    while ((bytes_read = read(source_fd, buffer, BUFFER_SIZE)) > 0) {
+        bytes_written = write(dest_fd, buffer, bytes_read);
+        if (bytes_written != bytes_read) {
+            perror("Error writing to destination file");
+            close(source_fd);
+            close(dest_fd);
+            exit(1);
         }
     }
 
-    // Calculate waiting and turnaround times
-    p[0].waitingTime = 0;
-    for (int i = 1; i < n; i++) {
-        p[i].waitingTime = p[i - 1].waitingTime + p[i - 1].burstTime;
-    }
+    // Close both files
+    close(source_fd);
+    close(dest_fd);
 
-    for (int i = 0; i < n; i++) {
-        p[i].turnaroundTime = p[i].waitingTime + p[i].burstTime;
-        totalWaitingTime += p[i].waitingTime;
-        totalTurnaroundTime += p[i].turnaroundTime;
-    }
-
-    // Output
-    printf("\nProcess\tBurst Time\tWaiting Time\tTurnaround Time\n");
-    for (int i = 0; i < n; i++) {
-        printf("P%d\t%d\t\t%d\t\t%d\n", p[i].pid, p[i].burstTime, p[i].waitingTime, p[i].turnaroundTime);
-    }
-
-    printf("\nAverage Waiting Time: %.2f", (float)totalWaitingTime / n);
-    printf("\nAverage Turnaround Time: %.2f\n", (float)totalTurnaroundTime / n);
+    printf("File copied successfully.\n");
 
     return 0;
 }
